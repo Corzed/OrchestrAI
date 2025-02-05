@@ -37,6 +37,9 @@ class Agent:
         self.manager = manager
         self.model = model  # Store the selected model.
 
+        if api_key:
+            openai.api_key = api_key
+
         # Register this agent with the manager.
         self.manager.register(self)
 
