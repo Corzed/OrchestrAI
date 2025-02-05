@@ -9,6 +9,11 @@ from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
 
+from dotenv import load_dotenv
+
+# Load variables from .env file if it exists.
+load_dotenv()
+
 class Agent:
     """
     Represents an agent that can engage in conversations and perform actions based on AI responses.
@@ -39,6 +44,8 @@ class Agent:
 
         if api_key:
             openai.api_key = api_key
+        else:
+            openai.api_key = os.getenv("OPENAI_API_KEY")
 
         # Register this agent with the manager.
         self.manager.register(self)
