@@ -4,10 +4,10 @@ from typing import Any, Dict, List, Optional, Union
 
 import openai
 
-from logging_utils import log_message, spinner
-from models import AIResponseModel, AGENT_RESPONSE_SCHEMA
-from agent_manager import AgentManager
-from agent_tool import AgentTool
+from .logging_utils import log_message, spinner
+from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA
+from .agent_manager import AgentManager
+from .agent_tool import AgentTool
 
 class Agent:
     """
