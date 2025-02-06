@@ -1,6 +1,6 @@
-# 🤖 AI Agent Framework
+# 🤖 OrchestrAI
 
-A modern AI agent framework built with **Pydantic V2**, **Rich logging**, and **OpenAI API** integration. This framework supports multi-agent collaboration, tool usage, and structured AI responses using JSON schema validation.
+A modern AI agentic orchestration framework. This framework supports multi-agent collaboration, tool usage, etc.
 
 ---
 
@@ -17,7 +17,7 @@ A modern AI agent framework built with **Pydantic V2**, **Rich logging**, and **
 ## 📦 Installation
 
 \```bash
-pip install openai pydantic rich python-dotenv
+pip install comingsoon
 \```
 
 ---
