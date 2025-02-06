@@ -17,7 +17,7 @@ A modern AI agentic orchestration framework. This framework supports multi-agent
 ## 📦 Installation
 
 ```bash
-pip install comingsoon
+pip install git+https://github.com/Corzed/OrchestrAI.git
 ```
 
 ---
