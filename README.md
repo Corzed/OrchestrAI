@@ -25,13 +25,13 @@ pip install git+https://github.com/Corzed/OrchestrAI.git
 
 ## 🚀 Usage
 
-### 2️⃣ Create an Agent Manager
+### Create an Agent Manager
 
 ```python
 manager = AgentManager()
 ```
 
-### 3️⃣ Define an AI Agent
+### Define an AI Agent
 
 ```python
 agent = Agent(
@@ -45,7 +45,7 @@ agent = Agent(
 )
 ```
 
-### 4️⃣ Add Tools to the Agent
+### Add Tools to the Agent
 
 ```python
 def calculator(a: int, b: int, operator: str) -> str:
@@ -77,7 +77,7 @@ calc_tool = AgentTool(
 )
 ```
 
-### 5️⃣ Add Child Agents
+### Add Child Agents
 
 Agents can collaborate by delegating tasks to child agents.
 
@@ -96,7 +96,7 @@ child_agent = Agent(
 
 Now, the main agent can delegate tasks to the child agent.
 
-### 6️⃣ Run a Conversation
+### Run a Conversation
 
 ```python
 response = agent.run_conversation("What's 2 + 2?")
