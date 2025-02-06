@@ -1,3 +1,4 @@
+import os
 import json
 import time
 from typing import Any, Dict, List, Optional, Union
@@ -8,11 +9,6 @@ from .logging_utils import log_message, spinner
 from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
-
-from dotenv import load_dotenv
-
-# Load variables from .env file if it exists.
-load_dotenv()
 
 class Agent:
     """
@@ -28,33 +24,32 @@ class Agent:
         tools: Optional[Dict[str, AgentTool]] = None,
         parent: Optional["Agent"] = None,
         verbose: bool = False,
-        model: str = None
+        model: str = None,
+        api_key: Optional[str] = None  # New parameter for manual API key setting
     ):
-        self.name = name
-        self.role = role
-        self.description = description
-        self.tools = tools if tools else {}  # Dictionary of available tools.
-        self.parent = parent
-        self.children: List["Agent"] = []  # List to hold child agents.
-        self.verbose = verbose
-        self.conversation_history: List[Dict[str, Any]] = []  # History of messages exchanged.
-        self.last_response: Optional[str] = None  # Final response from the agent.
-        self.manager = manager
-        self.model = model  # Store the selected model.
-
+        # Use the manual API key if provided; otherwise, try the environment variable.
         if api_key:
             openai.api_key = api_key
         else:
-            openai.api_key = os.getenv("OPENAI_API_KEY")
+            # If openai.api_key is not already set, attempt to load from environment variable.
+            if not openai.api_key:
+                openai.api_key = os.getenv("OPENAI_API_KEY")
+        
+        self.name = name
+        self.role = role
+        self.description = description
+        self.tools = tools if tools else {}
+        self.parent = parent
+        self.children: List["Agent"] = []
+        self.verbose = verbose
+        self.conversation_history: List[Dict[str, Any]] = []
+        self.last_response: Optional[str] = None
+        self.manager = manager
+        self.model = model
 
-        # Register this agent with the manager.
         self.manager.register(self)
-
-        # If this agent has a parent, register it as a child.
         if self.parent:
             self.parent.register_child(self)
-
-        # Initialize the system message that describes the agent's current context.
         self.update_system_message(initial=True)
 
     def update_system_message(self, initial: bool = False):
