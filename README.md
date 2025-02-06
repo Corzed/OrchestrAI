@@ -16,9 +16,9 @@ A modern AI agentic orchestration framework. This framework supports multi-agent
 
 ## 📦 Installation
 
-\```bash
+```bash
 pip install comingsoon
-\```
+```
 
 ---
 
