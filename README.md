@@ -22,6 +22,7 @@ pip install git+https://github.com/Corzed/OrchestrAI.git
 
 ---
 
+
 ## 🚀 Usage
 
 ### 2️⃣ Create an Agent Manager
