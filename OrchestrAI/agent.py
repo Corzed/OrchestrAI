@@ -181,11 +181,16 @@ class Agent:
                         # Execute the tool function with the provided parameters.
                         result = self.tools[action.tool.name](**action.tool.params)
                         log_message(self.name, f"Tool result: {result}", level="INFO")
-                        self.add_message("tool", f"{action.tool.name} -> {result}")
+                        self.add_message("tool", f"Successfully used {action.tool.name} -> {result}")
                     except Exception as e:
-                        log_message(self.name, f"Error with tool {action.tool.name}: {e}", level="ERROR")
+                        error_msg = f"Error with tool {action.tool.name}: {str(e)}"
+                        log_message(self.name, error_msg, level="ERROR")
+                        # Add the error to conversation history for context
+                        self.add_message("tool", f"Error while using {action.tool.name} -> {e}")
                 else:
-                    log_message(self.name, f"Tool not available: {action.tool.name if action.tool else None}", level="ERROR")
+                    error_msg = f"Tool not available: {action.tool.name if action.tool else None}"
+                    log_message(self.name, error_msg, level="ERROR")
+                    self.add_message("error", error_msg)
             elif action.type == "call_agent":
                 # Action to delegate a message to another agent.
                 allowed = set()
@@ -209,6 +214,7 @@ class Agent:
             else:
                 log_message(self.name, f"Unknown action type: {action.type}", level="ERROR")
         return final
+
 
     def run_conversation(self, initial_message: str) -> str:
         """
