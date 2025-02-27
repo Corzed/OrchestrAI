@@ -2,11 +2,12 @@ import os
 import json
 import time
 from typing import Any, Dict, List, Optional, Union
+import ast
 
 import openai
 
 from .logging_utils import log_message, spinner
-from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA
+from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA  # Remove ToolParams import
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
 
@@ -157,6 +158,19 @@ class Agent:
                 log_message(f"{self.name} Action", str(act), level="DEBUG")
         return ai_response
 
+    def _validate_strict_params(self, params: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Validates and converts tool parameters to strings, enforcing strict mode.
+        Each value is converted via str() if not already a string.
+        """
+        validated = {}
+        for key, value in params.items():
+            if not isinstance(value, str):
+                validated[key] = str(value)
+            else:
+                validated[key] = value
+        return validated
+
     def process_actions(self, ai_response: AIResponseModel) -> bool:
         """
         Processes each action returned by the AI response.
@@ -174,9 +188,17 @@ class Agent:
                 final = True
             elif action.type == "use_tool":
                 if action.tool and action.tool.name in self.tools:
-                    # Ensure params is a dictionary
-                    params = action.tool.params if isinstance(action.tool.params, dict) else {}
-                    log_message(self.name, f"Using {action.tool.name} with {params}", level="INFO")
+                    # If params is a string, parse it to a dict.
+                    if isinstance(action.tool.params, str):
+                        try:
+                            params_dict = json.loads(action.tool.params)
+                        except Exception as ex:
+                            raise ValueError(f"Invalid JSON in tool params: {ex}")
+                    else:
+                        params_dict = action.tool.params
+                    # Enforce strict values: convert every value to string.
+                    params = self._validate_strict_params(params_dict)
+                    log_message(self.name, f"Using {action.tool.name} with strict params {params}", level="INFO")
                     try:
                         result = self.tools[action.tool.name](**params)
                         log_message(self.name, f"Tool result: {result}", level="INFO")
