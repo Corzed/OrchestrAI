@@ -87,8 +87,7 @@ AGENT_RESPONSE_SCHEMA = {
                                         },
                                         "params": {
                                             "type": "object",
-                                            "properties": {},
-                                            "additionalProperties": False,
+                                            "additionalProperties": True,
                                             "description": "Tool parameters."
                                         }
                                     },
