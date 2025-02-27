@@ -1,17 +1,17 @@
 import json
 from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel, field_validator  # Using Pydantic V2 style
+from pydantic import BaseModel, field_validator
 
 class ToolModel(BaseModel):
     """
-    Pydantic model representing a tool with an optional name and a parameters dictionary.
+    Tool model with simple parameter handling.
+    In strict mode, params must be provided as a JSON-encoded string.
     """
     name: Optional[str] = None
-    params: Dict[str, Any] = {}  # Default to an empty dictionary.
+    params: str = ""  # Changed from Dict[str, Any] to a string
 
     class Config:
-        extra = "forbid"  # Forbid any extra fields.
+        extra = "forbid"
 
 class ActionModel(BaseModel):
     """
@@ -35,7 +35,7 @@ class ActionModel(BaseModel):
         return v
 
     class Config:
-        extra = "forbid"  # Forbid any extra fields.
+        extra = "forbid"
 
 class AIResponseModel(BaseModel):
     """
@@ -46,7 +46,7 @@ class AIResponseModel(BaseModel):
     actions: List[ActionModel]
 
     class Config:
-        extra = "forbid"  # Forbid any extra fields.
+        extra = "forbid"
 
 # JSON schema used to instruct the OpenAI API on the desired response format.
 AGENT_RESPONSE_SCHEMA = {
@@ -86,8 +86,7 @@ AGENT_RESPONSE_SCHEMA = {
                                             "description": "Tool name."
                                         },
                                         "params": {
-                                            "type": "object",
-                                            "properties": {},
+                                            "type": "string",
                                             "additionalProperties": False,
                                             "description": "Tool parameters."
                                         }
@@ -109,5 +108,5 @@ AGENT_RESPONSE_SCHEMA = {
         },
         "additionalProperties": False
     },
-    "strict": True  # Enforce strict schema validation.
+    "strict": True
 }
