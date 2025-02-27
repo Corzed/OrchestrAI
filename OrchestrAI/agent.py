@@ -198,7 +198,6 @@ class Agent:
                         except Exception as ex:
                             log_message(self.name, f"Invalid JSON in tool params: {ex}", level="ERROR")
                             self.add_message("error", f"Invalid JSON in tool params: {ex}")
-                            continue  # Skip this action if JSON parsing fails
                     else:
                         params_dict = action.tool.params
 
