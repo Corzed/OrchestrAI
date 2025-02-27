@@ -188,16 +188,21 @@ class Agent:
                 final = True
             elif action.type == "use_tool":
                 if action.tool and action.tool.name in self.tools:
-                    # If params is a string, parse it to a dict.
+                    # Initialize params_dict before the if/else block
+                    params_dict = {}
+                    
+                    # Parse params whether it's a string or dict
                     if isinstance(action.tool.params, str):
                         try:
                             params_dict = json.loads(action.tool.params)
                         except Exception as ex:
                             log_message(self.name, f"Invalid JSON in tool params: {ex}", level="ERROR")
                             self.add_message("error", f"Invalid JSON in tool params: {ex}")
+                            continue  # Skip this action if JSON parsing fails
                     else:
                         params_dict = action.tool.params
-                    # Enforce strict values: convert every value to string.
+
+                    # Convert all values to strings
                     params = self._validate_strict_params(params_dict)
                     log_message(self.name, f"Using {action.tool.name} with params {params}", level="INFO")
                     try:
