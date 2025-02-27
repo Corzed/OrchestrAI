@@ -88,7 +88,7 @@ AGENT_RESPONSE_SCHEMA = {
                                         "params": {
                                             "type": "string",
                                             "additionalProperties": False,
-                                            "description": "Tool parameters."
+                                            "description": "Tool parameters as a JSON-encoded string. Example: '{\"path\": \"hello.txt\", \"content\": \"Hello World\"}'"
                                         }
                                     },
                                     "additionalProperties": False
