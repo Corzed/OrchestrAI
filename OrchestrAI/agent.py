@@ -169,23 +169,21 @@ class Agent:
             log_message(f"{self.name} Processing", f"Reasoning: {ai_response.reasoning}", level="DEBUG")
         for action in ai_response.actions:
             if action.type == "respond":
-                # Final response action.
                 log_message(f"{self.name} Responds", action.message, level="INFO")
                 self.last_response = action.message
                 final = True
             elif action.type == "use_tool":
-                # Action to use a specific tool.
                 if action.tool and action.tool.name in self.tools:
-                    log_message(self.name, f"Using {action.tool.name} with {action.tool.params}", level="INFO")
+                    # Ensure params is a dictionary
+                    params = action.tool.params if isinstance(action.tool.params, dict) else {}
+                    log_message(self.name, f"Using {action.tool.name} with {params}", level="INFO")
                     try:
-                        # Execute the tool function with the provided parameters.
-                        result = self.tools[action.tool.name](**action.tool.params)
+                        result = self.tools[action.tool.name](**params)
                         log_message(self.name, f"Tool result: {result}", level="INFO")
                         self.add_message("tool", f"Successfully used {action.tool.name} -> {result}")
                     except Exception as e:
                         error_msg = f"Error with tool {action.tool.name}: {str(e)}"
                         log_message(self.name, error_msg, level="ERROR")
-                        # Add the error to conversation history for context
                         self.add_message("tool", f"Error while using {action.tool.name} -> {e}")
                 else:
                     error_msg = f"Tool not available: {action.tool.name if action.tool else None}"
