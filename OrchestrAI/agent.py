@@ -193,12 +193,13 @@ class Agent:
                         try:
                             params_dict = json.loads(action.tool.params)
                         except Exception as ex:
-                            raise ValueError(f"Invalid JSON in tool params: {ex}")
+                            log_message(self.name, f"Invalid JSON in tool params: {ex}", level="ERROR")
+                            self.add_message("error", f"Invalid JSON in tool params: {ex}")
                     else:
                         params_dict = action.tool.params
                     # Enforce strict values: convert every value to string.
                     params = self._validate_strict_params(params_dict)
-                    log_message(self.name, f"Using {action.tool.name} with strict params {params}", level="INFO")
+                    log_message(self.name, f"Using {action.tool.name} with params {params}", level="INFO")
                     try:
                         result = self.tools[action.tool.name](**params)
                         log_message(self.name, f"Tool result: {result}", level="INFO")
@@ -206,7 +207,7 @@ class Agent:
                     except Exception as e:
                         error_msg = f"Error with tool {action.tool.name}: {str(e)}"
                         log_message(self.name, error_msg, level="ERROR")
-                        self.add_message("tool", f"Error while using {action.tool.name} -> {e}")
+                        self.add_message("error", f"Error while using {action.tool.name} -> {e}")
                 else:
                     error_msg = f"Tool not available: {action.tool.name if action.tool else None}"
                     log_message(self.name, error_msg, level="ERROR")
