@@ -200,7 +200,7 @@ class Agent:
         """
         return {key: str(value) for key, value in params.items()}
 
-        def process_actions(self, ai_response: AIResponseModel) -> bool:
+    def process_actions(self, ai_response: AIResponseModel) -> bool:
         """
         Processes each action from the AI.
         Returns True if a final 'respond' action is encountered.
