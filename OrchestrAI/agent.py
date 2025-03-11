@@ -200,7 +200,7 @@ class Agent:
         """
         return {key: str(value) for key, value in params.items()}
 
-    def process_actions(self, ai_response: AIResponseModel) -> bool:
+        def process_actions(self, ai_response: AIResponseModel) -> bool:
         """
         Processes each action from the AI.
         Returns True if a final 'respond' action is encountered.
@@ -216,16 +216,40 @@ class Agent:
                 final = True
             elif action.type == "use_tool":
                 if action.tool and action.tool.name in self.tools:
+                    tool_func = self.tools[action.tool.name].func
                     try:
-                        params_dict = json.loads(action.tool.params) if isinstance(action.tool.params, str) else action.tool.params
+                        # Attempt to parse the parameters.
+                        params_input = action.tool.params
+                        if isinstance(params_input, str):
+                            params_parsed = json.loads(params_input)
+                        else:
+                            params_parsed = params_input
+                        # If the parsed parameters are not a dict but a list, convert them.
+                        if not isinstance(params_parsed, dict):
+                            if isinstance(params_parsed, list):
+                                sig = inspect.signature(tool_func)
+                                expected_params = list(sig.parameters.keys())
+                                if len(params_parsed) == len(expected_params):
+                                    params_parsed = dict(zip(expected_params, params_parsed))
+                                else:
+                                    error_msg = (f"Parameter mismatch for {action.tool.name}: expected a dict or a list of length "
+                                                 f"{len(expected_params)}, got a list of length {len(params_parsed)}")
+                                    log_message(self.name, error_msg, level="ERROR")
+                                    self.history.add_assistant(error_msg)
+                                    continue
+                            else:
+                                error_msg = f"Tool params for {action.tool.name} must be a JSON object or list, got {type(params_parsed)}"
+                                log_message(self.name, error_msg, level="ERROR")
+                                self.history.add_assistant(error_msg)
+                                continue
                     except Exception as ex:
                         error_msg = f"Invalid JSON in tool params: {ex}"
                         log_message(self.name, error_msg, level="ERROR")
                         self.history.add_assistant(error_msg)
                         continue
-                    params = self._validate_strict_params(params_dict)
+
+                    params = self._validate_strict_params(params_parsed)
                     # Validate parameter names using the tool function's signature.
-                    tool_func = self.tools[action.tool.name].func
                     sig = inspect.signature(tool_func)
                     expected_params = set(sig.parameters.keys())
                     provided_params = set(params.keys())
@@ -234,13 +258,15 @@ class Agent:
                         log_message(self.name, error_msg, level="ERROR")
                         self.history.add_assistant(error_msg)
                         continue
-                    
                     log_message(self.name, f"Using {action.tool.name} with params {params}", level="INFO")
                     try:
-                        result = self.tools[action.tool.name](**params)
-                        log_message(self.name, f"Tool result: {result}", level="INFO")
-                        # Add the tool result using the "function" role with the tool's name.
-                        self.history.add_function(f"{result}", name=action.tool.name)
+                        result = tool_func(**params)
+                        if result is None:
+                            tool_result = "Tool executed successfully with no output."
+                        else:
+                            tool_result = result
+                        log_message(self.name, f"Tool result: {tool_result}", level="INFO")
+                        self.history.add_function(f"{tool_result}", name=action.tool.name)
                     except Exception as e:
                         error_msg = f"Error with tool {action.tool.name}: {e}"
                         log_message(self.name, error_msg, level="ERROR")
@@ -269,6 +295,7 @@ class Agent:
             else:
                 log_message(self.name, f"Unknown action type: {action.type}", level="ERROR")
         return final
+
 
     def run_conversation(self, initial_message: str) -> str:
         """
