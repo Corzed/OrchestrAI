@@ -178,7 +178,7 @@ class Agent:
             return AIResponseModel.model_validate(parsed)
         except Exception as e:
             log_message(self.name, f"Response parsing error: {e}", level="ERROR")
-            raise ValueError(f"[{self.name}] Error parsing response: {e}")
+            self.history.add_assistant("Error parsing response: {e}")
 
     def send(self, message: str) -> AIResponseModel:
         """
