@@ -4,4 +4,4 @@ from .agent_tool import AgentTool
 from .logging_utils import log_message, spinner
 from .models import ToolModel, ActionModel, AIResponseModel, AGENT_RESPONSE_SCHEMA
 
-__version__ = "0.2.0"
+__version__ = "0.2.5"
