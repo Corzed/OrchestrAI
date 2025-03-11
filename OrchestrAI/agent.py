@@ -1,21 +1,65 @@
 import os
 import json
-import time
-from typing import Any, Dict, List, Optional, Union
-import ast
-
 import openai
+import inspect
+from typing import Any, Dict, List, Optional
 
 from .logging_utils import log_message, spinner
-from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA  # Remove ToolParams import
+from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
 
+import dotenv
+dotenv.load_dotenv()
+
+# -----------------------------------------------------------------------------
+# ConversationHistory
+# -----------------------------------------------------------------------------
+class ConversationHistory:
+    """
+    Manages conversation messages in a format compatible with the OpenAI Chat API.
+    Allowed roles: "system", "user", "assistant", "function".
+    """
+    def __init__(self, system_message: Optional[str] = None):
+        self.messages: List[Dict[str, Any]] = []
+        if system_message:
+            self._update_or_add("system", system_message)
+
+    def _update_or_add(self, role: str, content: str):
+        """
+        Updates the first message with the given role if it exists; otherwise, adds it.
+        """
+        for msg in self.messages:
+            if msg["role"] == role:
+                msg["content"] = content
+                return
+        self.messages.insert(0, {"role": role, "content": content})
+
+    def add_system(self, content: str):
+        self._update_or_add("system", content)
+
+    def add_user(self, content: str):
+        self.messages.append({"role": "user", "content": content})
+
+    def add_assistant(self, content: str):
+        self.messages.append({"role": "assistant", "content": content})
+
+    def add_function(self, content: str, name: str):
+        """
+        Adds a function message with the specified tool's name.
+        """
+        self.messages.append({"role": "function", "content": content, "name": name})
+
+    def get_messages(self) -> List[Dict[str, Any]]:
+        return self.messages
+
+    def update_system(self, content: str):
+        self._update_or_add("system", content)
+
+# -----------------------------------------------------------------------------
+# Agent
+# -----------------------------------------------------------------------------
 class Agent:
-    """
-    Represents an agent that can engage in conversations and perform actions based on AI responses.
-    The agent can use tools, delegate to child agents, or directly respond.
-    """
     def __init__(
         self,
         name: str,
@@ -26,212 +70,198 @@ class Agent:
         parent: Optional["Agent"] = None,
         verbose: bool = False,
         model: str = None,
-        api_key: Optional[str] = None  # New parameter for manual API key setting
+        api_key: Optional[str] = None
     ):
-        # Use the manual API key if provided; otherwise, try the environment variable.
-        if api_key:
-            openai.api_key = api_key
-        else:
-            # If openai.api_key is not already set, attempt to load from environment variable.
-            if not openai.api_key:
-                openai.api_key = os.getenv("OPENAI_API_KEY")
+        # Set API key.
+        openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
         
         self.name = name
         self.role = role
         self.description = description
-        self.tools = tools if tools else {}
+        self.tools = tools or {}
         self.parent = parent
         self.children: List["Agent"] = []
         self.verbose = verbose
-        self.conversation_history: List[Dict[str, Any]] = []
-        self.last_response: Optional[str] = None
         self.manager = manager
         self.model = model
+        self.last_response: Optional[str] = None
 
+        # Build a detailed system message:
+        # Include your role and list all available tools along with the exact expected parameter names.
+        if self.tools:
+            tool_info_list = []
+            for tool in self.tools.values():
+                sig = inspect.signature(tool.func)
+                params_list = list(sig.parameters.keys())
+                tool_info_list.append(f"{tool.name} (expects parameters: {params_list})")
+            tool_info = "; ".join(tool_info_list)
+        else:
+            tool_info = "none"
+
+        # Optionally include child agent info if available.
+        child_info = "none"  # Initially no children.
+        system_message = (
+            f"Your role is {self.role}. You have access to the following Tools: {tool_info}. "
+            "When calling a tool (action type 'use_tool'), output a JSON that includes a 'tool' object with a 'name' "
+            "and a 'params' field. The 'params' field must be a JSON-encoded string containing exactly the parameters "
+            "expected by that tool. The expected JSON output must follow the provided schema. "
+            f"Peer Agents: {child_info}."
+        )
+        # Initialize conversation history with this system message.
+        self.history = ConversationHistory(system_message)
+        
         self.manager.register(self)
         if self.parent:
             self.parent.register_child(self)
-        self.update_system_message(initial=True)
-
-    def update_system_message(self, initial: bool = False):
-        """
-        Updates the system message that holds context about available tools and agents.
-        """
-        tool_list = ", ".join(f"{t.name} ({t.description})" for t in self.tools.values()) if self.tools else "none"
-        child_list = ", ".join(f"{c.name} ({c.description})" for c in self.children) if self.children else "none"
-        system_text = f"{self.role} Tools: {tool_list}. Agents: {child_list}."
-        
-        if self.conversation_history:
-            current_system = self.conversation_history[0]["content"][0]["text"]
-            if current_system == system_text:
-                return  # No change required.
-            # Update the system message.
-            self.conversation_history[0] = {"role": "system", "content": [{"type": "text", "text": system_text}]}
-        else:
-            # Insert the system message if none exists.
-            self.conversation_history.insert(0, {"role": "system", "content": [{"type": "text", "text": system_text}]})
-        
-        # Log the update if in verbose mode (but not on initial setup).
-        if self.verbose and not initial:
-            log_message(f"{self.name} System", system_text, level="DEBUG")
 
     def register_child(self, child: "Agent"):
-        """
-        Registers a child agent and updates the system message.
-        """
         self.children.append(child)
         if self.verbose:
             log_message(self.name, f"Registered child agent '{child.name}'.", level="DEBUG")
-        self.update_system_message()
+        # Update system message to include child agent info.
+        child_info = ", ".join(f"{c.name} ({c.description})" for c in self.children) or "none"
+        # Rebuild the system message; tool info remains unchanged.
+        if self.tools:
+            tool_info_list = []
+            for tool in self.tools.values():
+                sig = inspect.signature(tool.func)
+                params_list = list(sig.parameters.keys())
+                tool_info_list.append(f"{tool.name} (expects parameters: {params_list})")
+            tool_info = "; ".join(tool_info_list)
+        else:
+            tool_info = "none"
+        system_message = (
+            f"Your role is {self.role}. You have access to the following Tools: {tool_info}. "
+            "When calling a tool (action type 'use_tool'), output a JSON that includes a 'tool' object with a 'name' "
+            "and a 'params' field. The 'params' field must be a JSON-encoded string containing exactly the parameters "
+            "expected by that tool. The expected JSON output must follow the provided schema. "
+            f"Peer Agents: {child_info}."
+        )
+        self.history.update_system(system_message)
 
-    def add_message(self, sender: str, text: str):
+    def call_api(self, message: str) -> Any:
         """
-        Appends a new message to the conversation history.
+        Appends a user message and calls the OpenAI API using the current conversation history.
         """
-        full_text = f"{sender}: {text}"
-        self.conversation_history.append({"role": "system", "content": [{"type": "text", "text": full_text}]})
-
-    def send(self, message: str, sender: str = "user") -> AIResponseModel:
-        """
-        Sends a message to the OpenAI API, adds the message to the conversation history,
-        receives a response, and parses it into an AIResponseModel.
-        """
-        # Add the outgoing message to the conversation history.
-        self.add_message(sender, message)
+        self.history.add_user(message)
+        api_params = {
+            "model": self.model,
+            "messages": self.history.get_messages(),
+            "response_format": {"type": "json_schema", "json_schema": AGENT_RESPONSE_SCHEMA},
+            "temperature": 0.7,
+            "max_completion_tokens": 2048,
+            "top_p": 1,
+            "frequency_penalty": 0,
+            "presence_penalty": 0
+        }
         try:
-            # Use the spinner if verbose mode is enabled.
             if self.verbose:
                 with spinner("Waiting for response..."):
-                    response = openai.chat.completions.create(
-                        model=self.model,  # Use the model selected by the user.
-                        messages=self.conversation_history,
-                        response_format={"type": "json_schema", "json_schema": AGENT_RESPONSE_SCHEMA},
-                        temperature=1,
-                        max_completion_tokens=2048,
-                        top_p=1,
-                        frequency_penalty=0,
-                        presence_penalty=0
-                    )
+                    response = openai.chat.completions.create(**api_params)
             else:
-                # Make the API call without the spinner.
-                response = openai.chat.completions.create(
-                    model=self.model,  # Use the model selected by the user.
-                    messages=self.conversation_history,
-                    response_format={"type": "json_schema", "json_schema": AGENT_RESPONSE_SCHEMA},
-                    temperature=1,
-                    max_completion_tokens=2048,
-                    top_p=1,
-                    frequency_penalty=0,
-                    presence_penalty=0
-                )
+                response = openai.chat.completions.create(**api_params)
         except Exception as e:
-            log_message(self.name, f"Error during API call: {e}", level="ERROR")
+            log_message(self.name, f"API call error: {e}", level="ERROR")
             raise
+        return response
 
-        # Extract the content of the reply.
-        reply = response.choices[0].message.content
-
-        # Process the reply in case it is in list format.
+    def parse_response(self, reply: Any) -> AIResponseModel:
+        """
+        Parses the raw API reply into an AIResponseModel.
+        """
         if isinstance(reply, list):
-            if reply and isinstance(reply[0], dict) and "text" in reply[0]:
-                reply = reply[0]["text"]
-            else:
-                reply = str(reply[0])
+            reply = reply[0].get("text", str(reply[0]))
         elif not isinstance(reply, str):
             reply = str(reply)
-
         try:
-            # Attempt to parse the reply as JSON and validate it against the AIResponseModel.
             parsed = json.loads(reply)
-            ai_response = AIResponseModel.model_validate(parsed)
+            return AIResponseModel.model_validate(parsed)
         except Exception as e:
-            log_message(self.name, f"Error parsing response: {e}", level="ERROR")
+            log_message(self.name, f"Response parsing error: {e}", level="ERROR")
             raise ValueError(f"[{self.name}] Error parsing response: {e}")
 
-        # Add the assistant's reply to the conversation history.
-        self.add_message("assistant", reply)
-
-        # If verbose, log the reasoning and actions.
+    def send(self, message: str) -> AIResponseModel:
+        """
+        Sends a user message to the API and logs the assistant's reply.
+        """
+        response = self.call_api(message)
+        reply = response.choices[0].message.content
+        ai_response = self.parse_response(reply)
+        self.history.add_assistant(reply)
         if self.verbose:
-            log_message(f"{self.name} Received", f"Reasoning: {ai_response.reasoning}", level="INFO")
+            log_message(self.name, f"Reasoning: {ai_response.reasoning}", level="INFO")
             for act in ai_response.actions:
-                log_message(f"{self.name} Action", str(act), level="DEBUG")
+                log_message(self.name, f"Action: {act}", level="DEBUG")
         return ai_response
 
     def _validate_strict_params(self, params: Dict[str, Any]) -> Dict[str, str]:
         """
-        Validates and converts tool parameters to strings, enforcing strict mode.
-        Each value is converted via str() if not already a string.
+        Converts all provided tool parameters to strings.
         """
-        validated = {}
-        for key, value in params.items():
-            if not isinstance(value, str):
-                validated[key] = str(value)
-            else:
-                validated[key] = value
-        return validated
+        return {key: str(value) for key, value in params.items()}
 
     def process_actions(self, ai_response: AIResponseModel) -> bool:
         """
-        Processes each action returned by the AI response.
-        Executes tool usage, agent delegation, or final response accordingly.
-        Returns True if a final response ('respond' action) was generated.
+        Processes each action from the AI.
+        Returns True if a final 'respond' action is encountered.
         """
         self.last_response = None
         final = False
         if self.verbose:
-            log_message(f"{self.name} Processing", f"Reasoning: {ai_response.reasoning}", level="DEBUG")
+            log_message(self.name, f"Processing actions with reasoning: {ai_response.reasoning}", level="DEBUG")
         for action in ai_response.actions:
             if action.type == "respond":
-                log_message(f"{self.name} Responds", action.message, level="INFO")
+                log_message(self.name, action.message, level="INFO")
                 self.last_response = action.message
                 final = True
             elif action.type == "use_tool":
                 if action.tool and action.tool.name in self.tools:
-                    # Initialize params_dict before the if/else block
-                    params_dict = {}
-                    
-                    # Parse params whether it's a string or dict
-                    if isinstance(action.tool.params, str):
-                        try:
-                            params_dict = json.loads(action.tool.params)
-                        except Exception as ex:
-                            log_message(self.name, f"Invalid JSON in tool params: {ex}", level="ERROR")
-                            self.add_message("error", f"Invalid JSON in tool params: {ex}")
-                    else:
-                        params_dict = action.tool.params
-
-                    # Convert all values to strings
+                    try:
+                        params_dict = json.loads(action.tool.params) if isinstance(action.tool.params, str) else action.tool.params
+                    except Exception as ex:
+                        error_msg = f"Invalid JSON in tool params: {ex}"
+                        log_message(self.name, error_msg, level="ERROR")
+                        self.history.add_assistant(error_msg)
+                        continue
                     params = self._validate_strict_params(params_dict)
+                    # Validate parameter names using the tool function's signature.
+                    tool_func = self.tools[action.tool.name].func
+                    sig = inspect.signature(tool_func)
+                    expected_params = set(sig.parameters.keys())
+                    provided_params = set(params.keys())
+                    if provided_params != expected_params:
+                        error_msg = (f"Parameter mismatch for {action.tool.name}: expected {expected_params}, got {provided_params}")
+                        log_message(self.name, error_msg, level="ERROR")
+                        self.history.add_assistant(error_msg)
+                        continue
+                    
                     log_message(self.name, f"Using {action.tool.name} with params {params}", level="INFO")
                     try:
                         result = self.tools[action.tool.name](**params)
                         log_message(self.name, f"Tool result: {result}", level="INFO")
-                        self.add_message("tool", f"Successfully used {action.tool.name} -> {result}")
+                        # Add the tool result using the "function" role with the tool's name.
+                        self.history.add_function(f"{result}", name=action.tool.name)
                     except Exception as e:
-                        error_msg = f"Error with tool {action.tool.name}: {str(e)}"
+                        error_msg = f"Error with tool {action.tool.name}: {e}"
                         log_message(self.name, error_msg, level="ERROR")
-                        self.add_message("error", f"Error while using {action.tool.name} -> {e}")
+                        self.history.add_assistant(error_msg)
                 else:
                     error_msg = f"Tool not available: {action.tool.name if action.tool else None}"
                     log_message(self.name, error_msg, level="ERROR")
-                    self.add_message("error", error_msg)
+                    self.history.add_assistant(error_msg)
             elif action.type == "call_agent":
-                # Action to delegate a message to another agent.
-                allowed = set()
-                if self.parent:
-                    allowed.add(self.parent.name)
+                allowed = {self.parent.name} if self.parent else set()
                 allowed.update(c.name for c in self.children)
                 if action.agent not in allowed:
-                    log_message(self.name, f"Cannot call agent {action.agent}. Allowed: {allowed}", level="ERROR")
+                    log_message(self.name, f"Agent call not allowed: {action.agent}. Allowed: {allowed}", level="ERROR")
                     continue
                 target = self.manager.get(action.agent)
                 if target:
-                    log_message(f"{self.name} Delegates", f"To {action.agent}: {action.message}", level="INFO")
+                    log_message(self.name, f"Delegating to {action.agent}: {action.message}", level="INFO")
                     final_response = target.run_conversation(action.message)
                     if final_response:
-                        self.add_message(action.agent, final_response)
-                        log_message(f"{self.name} Received", f"From {action.agent}: {final_response}", level="INFO")
+                        self.history.add_assistant(f"{action.agent}: {final_response}")
+                        log_message(self.name, f"Received from {action.agent}: {final_response}", level="INFO")
                     else:
                         log_message(self.name, f"No final response from {action.agent}", level="ERROR")
                 else:
@@ -240,22 +270,15 @@ class Agent:
                 log_message(self.name, f"Unknown action type: {action.type}", level="ERROR")
         return final
 
-
     def run_conversation(self, initial_message: str) -> str:
         """
-        Runs the conversation loop until a final 'respond' action is generated.
-        Returns the final response message.
+        Runs the conversation loop until a final 'respond' action is produced.
         """
         try:
-            # Send the initial message to the API.
-            current = self.send(initial_message)
-            # Process the actions from the response.
-            complete = self.process_actions(current)
-            # Continue the loop until a final response is produced.
-            while not complete:
-                current = self.send("Continue decision making.", sender=self.name)
-                complete = self.process_actions(current)
+            ai_response = self.send(initial_message)
+            while not self.process_actions(ai_response):
+                ai_response = self.send("Continue decision making.")
             return self.last_response
         except Exception as e:
-            log_message(self.name, f"Conversation halted due to error: {e}", level="ERROR")
+            log_message(self.name, f"Conversation error: {e}", level="ERROR")
             raise
