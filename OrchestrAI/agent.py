@@ -119,9 +119,7 @@ class Agent:
         api_params = {
             "model": self.model,
             "messages": self.history.get_messages(),
-            "response_format": {"type": "json_schema", "schema": AGENT_RESPONSE_SCHEMA},
-            "temperature": 0.7,
-            "max_tokens": 1024,  # Reduced from 2048 to save tokens
+            "response_format": {"type": "json_schema", "json_schema": AGENT_RESPONSE_SCHEMA},
         }
         
         try:
