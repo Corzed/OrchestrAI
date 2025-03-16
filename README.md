@@ -322,9 +322,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgements
-
-- OpenAI for providing the foundation models
-- Rich library for beautiful console output
-- All contributors who have helped shape this project
