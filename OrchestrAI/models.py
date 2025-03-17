@@ -2,8 +2,8 @@ from typing import List, Optional
 from pydantic import BaseModel, field_validator
 
 class ToolModel(BaseModel):
-    name: Optional[str] = None
-    params: str = ""  # JSON string of parameters
+    name: str
+    params: str = "{}"  # Default empty JSON object
     
     class Config:
         extra = "forbid"
@@ -24,79 +24,63 @@ class ActionModel(BaseModel):
         extra = "forbid"
 
 class AIResponseModel(BaseModel):
-    reasoning: str
+    reasoning: Optional[str] = None  # Make reasoning optional
     actions: List[ActionModel]
     
     class Config:
         extra = "forbid"
 
-# Simplified schema with only essential fields
-AGENT_RESPONSE_SCHEMA = {
-  "name": "agent_response",
-  "schema": {
-    "type": "object",
-    "properties": {
-      "reasoning": {
-        "type": "string",
-        "description": "Reasoning behind actions."
-      },
-      "actions": {
-        "type": "array",
-        "description": "List of actions taken based on the reasoning.",
-        "items": {
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "enum": [
-                "respond",
-                "use_tool",
-                "call_agent"
-              ],
-              "description": "The type of action."
-            },
-            "agent": {
-              "type": "string",
-              "description": "Optional agent associated with the action."
-            },
-            "tool": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "description": "Name of the tool."
+# Dynamic schema generation for response format
+def get_response_schema(include_reasoning=True):
+    properties = {
+        "actions": {
+            "type": "array",
+            "description": "List of actions to take",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["respond", "use_tool", "call_agent"],
+                        "description": "The type of action"
+                    },
+                    "agent": {
+                        "type": "string",
+                        "description": "Optional agent name for delegation"
+                    },
+                    "tool": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "params": {"type": "string"}
+                        },
+                        "required": ["name"]
+                    },
+                    "message": {"type": "string"}
                 },
-                "params": {
-                  "type": "string",
-                  "description": "Parameters for the tool in JSON string format."
-                }
-              },
-              "required": [
-                "name",
-                "params"
-              ],
-              "additionalProperties": False
-            },
-            "message": {
-              "type": "string",
-              "description": "Message related to the action."
+                "required": ["type"]
             }
-          },
-          "required": [
-            "type",
-            "agent",
-            "tool",
-            "message"
-          ],
-          "additionalProperties": False
         }
-      }
-    },
-    "required": [
-      "reasoning",
-      "actions"
-    ],
-    "additionalProperties": False
-  },
-  "strict": True
-}
+    }
+    
+    # Add reasoning field if enabled
+    if include_reasoning:
+        properties["reasoning"] = {
+            "type": "string",
+            "description": "Reasoning behind actions"
+        }
+    
+    required_fields = ["actions"]
+    if include_reasoning:
+        required_fields.append("reasoning")
+    
+    return {
+        "name": "agent_response",
+        "schema": {
+            "type": "object",
+            "properties": properties,
+            "required": required_fields,
+            "additionalProperties": False
+        },
+        "strict": True
+    }
