@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OrchestrAI"
-version = "0.3.0"
+version = "0.3.5"
 description = "An agentic orchestration framework."
 readme = "README.md"
 requires-python = ">=3.7"
