@@ -84,5 +84,3 @@ def get_response_schema(include_reasoning=True):
         },
         "strict": True
     }
-
-AGENT_RESPONSE_SCHEMA = get_response_schema()["schema"]
