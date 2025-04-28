@@ -5,11 +5,9 @@ import inspect
 import openai
 
 from .logging_utils import log_message, spinner
-from .models import AIResponseModel, get_response_schema
+from .models import AIResponseModel, AGENT_RESPONSE_SCHEMA
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
-
-AGENT_RESPONSE_SCHEMA = get_response_schema()["schema"]
 
 # -----------------------------------------------------------------------------
 # ConversationHistory
