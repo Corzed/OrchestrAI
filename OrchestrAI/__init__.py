@@ -2,6 +2,6 @@ from .agent import Agent
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
 from .logging_utils import log_message, spinner
-from .models import ToolModel, ActionModel, AIResponseModel, AGENT_RESPONSE_SCHEMA
+from .models import ToolModel, ActionModel, AIResponseModel, AGENT_RESPONSE_JSON_SCHEMA
 
-__version__ = "0.3.5"
+__version__ = "0.5"
