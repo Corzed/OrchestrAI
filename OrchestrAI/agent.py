@@ -9,6 +9,8 @@ from .models import AIResponseModel, get_response_schema
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
 
+AGENT_RESPONSE_SCHEMA = get_response_schema()["schema"]
+
 # -----------------------------------------------------------------------------
 # ConversationHistory
 # -----------------------------------------------------------------------------
