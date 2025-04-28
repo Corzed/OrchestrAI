@@ -270,6 +270,3 @@ class Agent:
         except Exception as e:
             log_message(self.name, f"Conversation error: {e}", level="ERROR")
             raise
-
-# Import schema here to avoid circular imports
-from .models import AGENT_RESPONSE_SCHEMA
