@@ -24,15 +24,19 @@ class ActionModel(BaseModel):
         extra = "forbid"
 
 class AIResponseModel(BaseModel):
-    reasoning: Optional[str] = None  # Make reasoning optional
     actions: List[ActionModel]
     
     class Config:
         extra = "forbid"
 
-# Dynamic schema generation for response format
-def get_response_schema(include_reasoning=True):
-    properties = {
+AGENT_RESPONSE_SCHEMA = {
+    "type": "object",
+    "name": "agent_response",
+    "properties": {
+        "reasoning": {
+            "type": "string",
+            "description": "Reasoning behind actions"
+        },
         "actions": {
             "type": "array",
             "description": "List of actions to take",
@@ -61,26 +65,7 @@ def get_response_schema(include_reasoning=True):
                 "required": ["type"]
             }
         }
-    }
-    
-    # Add reasoning field if enabled
-    if include_reasoning:
-        properties["reasoning"] = {
-            "type": "string",
-            "description": "Reasoning behind actions"
-        }
-    
-    required_fields = ["actions"]
-    if include_reasoning:
-        required_fields.append("reasoning")
-    
-    return {
-        "name": "agent_response",
-        "schema": {
-            "type": "object",
-            "properties": properties,
-            "required": required_fields,
-            "additionalProperties": False
-        },
-        "strict": True
-    }
+    },
+    "required": ["reasoning", "actions"],
+    "additionalProperties": False
+}
