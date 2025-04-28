@@ -5,7 +5,7 @@ import inspect
 import openai
 
 from .logging_utils import log_message, spinner
-from .models import AIResponseModel
+from .models import AIResponseModel, get_response_schema
 from .agent_manager import AgentManager
 from .agent_tool import AgentTool
 
