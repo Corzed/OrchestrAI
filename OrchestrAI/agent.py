@@ -15,19 +15,29 @@ class ConversationHistory:
         self.messages = []
         if system_message:
             self.add_system(system_message)
+            
     def add_system(self, content: str):
         for msg in self.messages:
             if msg["role"] == "system":
                 msg["content"] = content
                 return
         self.messages.insert(0, {"role": "system", "content": content})
+        
     def add_message(self, role: str, content: str, **kwargs):
         entry = {"role": role, "content": content, **kwargs}
         self.messages.append({k: v for k, v in entry.items() if v is not None})
-    def add_user(self, content: str):    self.add_message("user", content)
-    def add_assistant(self, content: str): self.add_message("assistant", content)
-    def add_function(self, content: str, name: str): self.add_message("function", content, name=name)
-    def get_messages(self): return self.messages
+        
+    def add_user(self, content: str):
+        self.add_message("user", content)
+        
+    def add_assistant(self, content: str):
+        self.add_message("assistant", content)
+        
+    def add_function(self, content: str, name: str):
+        self.add_message("function", content, name=name)
+        
+    def get_messages(self):
+        return self.messages
 
 class Agent:
     def __init__(self, name: str, role: str, description: str,
