@@ -16,7 +16,7 @@ OrchestrAI enables you to create and manage a network of AI agents that can:
 
 ## ✨ Key Features
 
-- **Hierarchical Agent Architecture**: Create parent-child agent relationships with clear delegation paths
+- **Hierarchical Agent Architecture**: Create **parent-child** agent relationships with clear delegation paths
 - **Dynamic Tool Integration**: Define and attach tools to agents with proper parameter validation
 - **Structured Communication**: Agents communicate via a well-defined JSON schema for reliable interaction
 - **Flexible Deployment**: Use different models for different agents based on task complexity
